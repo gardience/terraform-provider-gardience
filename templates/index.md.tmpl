@@ -1,0 +1,34 @@
+---
+page_title: "Gardience Provider"
+description: |-
+  Enroll the machines Terraform builds into Gardience so they are patched, hardened and audited from first boot, and manage node groups, saved states and event rules as code.
+---
+
+# Gardience Provider
+
+[Gardience](https://gardience.com) is a supported console for Windows and Linux machines on open-source
+[Salt](https://saltproject.io): patching, a scored STIG/CIS-aligned baseline, drift repair, event-driven
+automation, two-person approval and a tamper-evident audit log.
+
+With this provider, Terraform builds the machine and Gardience takes over from its first boot:
+
+1. `gardience_enrollment` gives a first-boot script for the machine's `user_data`. The machine installs the
+   pinned, hash-checked Salt agent and joins without anyone approving it.
+2. A `gardience_event_rule` of kind `join` applies a saved state (`gardience_state`) to it the moment it joins.
+3. `gardience_machine` waits until it has joined, and removes it from the fleet on `terraform destroy`.
+
+Every change the provider makes is recorded in Gardience's audit log under the API key's owner.
+
+## Authentication
+
+The provider uses a Gardience **configure** API key. An admin creates one in **Settings > API keys** with the
+scope **Configure (Terraform, admins)**. Configure keys manage configuration and remove machines; they never run
+anything on the fleet. Requires Gardience 1.5.0 or later.
+
+{{ tffile "examples/provider/provider.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Example: web servers that configure themselves
+
+{{ tffile "examples/complete-aws/main.tf" }}

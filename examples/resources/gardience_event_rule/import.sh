@@ -1,0 +1,1 @@
+terraform import gardience_event_rule.keep_nginx keep-nginx
