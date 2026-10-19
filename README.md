@@ -48,8 +48,9 @@ rule, then destroyed) lives with the Gardience server source and runs in every G
 
 ## Verify a release
 
-Each release has a `SHA256SUMS` file signed with the Gardience provider signing key. The Terraform Registry and
-OpenTofu check the signature when they install the provider.
+Each release has a `SHA256SUMS` file signed with the Gardience provider signing key, fingerprint
+`7D4F EF04 FF05 7ECC 85E6 1D37 3F4E 9402 C40E 7D3E`. The Terraform Registry and OpenTofu check the signature when they
+install the provider. The public key is in [signing-key.asc](signing-key.asc).
 
 ## License
 

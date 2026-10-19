@@ -1,5 +1,5 @@
 # Release build for the Terraform Registry: zipped binaries per platform, a SHA256SUMS file and its detached GPG
-# signature, and the registry manifest. Run locally with GPG_FINGERPRINT set:  goreleaser release --clean
+# signature, and the registry manifest. Run locally with GPG_FINGERPRINT and GPG_PASSPHRASE set (tools: release.sh)
 version: 2
 before:
   hooks:
@@ -26,7 +26,7 @@ checksum:
   algorithm: sha256
 signs:
   - artifacts: checksum
-    args: ["--batch", "--local-user", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]
+    args: ["--batch", "--pinentry-mode", "loopback", "--passphrase", "{{ .Env.GPG_PASSPHRASE }}", "--local-user", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]
 release:
   extra_files:
     - glob: terraform-registry-manifest.json
