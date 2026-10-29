@@ -82,7 +82,7 @@ func (p *gardienceProvider) Configure(ctx context.Context, req provider.Configur
 }
 
 func (p *gardienceProvider) Resources(_ context.Context) []func() resource.Resource {
-	return []func() resource.Resource{NewEnrollmentResource, NewNodeGroupResource, NewStateResource, NewEventRuleResource, NewMachineResource}
+	return []func() resource.Resource{NewEnrollmentResource, NewNodeGroupResource, NewStateResource, NewEventRuleResource, NewMachineResource, NewRunbookResource, NewScheduleResource, NewChangeWindowResource}
 }
 
 func (p *gardienceProvider) DataSources(_ context.Context) []func() datasource.DataSource {

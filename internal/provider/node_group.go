@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"net/url"
+	"regexp"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -72,13 +74,17 @@ func (r *nodeGroupResource) put(ctx context.Context, m *nodeGroupModel) error {
 	if err := r.c.Do(ctx, "PUT", "/groups/"+url.PathEscape(m.Name.ValueString()), body, nil); err != nil {
 		return err
 	}
-	return r.read(ctx, m)
+	return r.read(ctx, m, false)
 }
 
-func (r *nodeGroupResource) read(ctx context.Context, m *nodeGroupModel) error {
+// read refreshes the group; with adopt, a group imported or changed in the console is described as it is there.
+func (r *nodeGroupResource) read(ctx context.Context, m *nodeGroupModel, adopt bool) error {
 	var g groupAPI
 	if err := r.c.Do(ctx, "GET", "/groups/"+url.PathEscape(m.Name.ValueString()), nil, &g); err != nil {
 		return err
+	}
+	if adopt && (m.Kind.IsNull() || (!m.Target.IsNull() && m.Target.ValueString() != g.Expr)) {
+		fromExpr(ctx, m, g.Expr) // imported, or changed in the console: describe it as written there
 	}
 	m.Target = types.StringValue(g.Expr)
 	if g.Members == nil {
@@ -108,7 +114,7 @@ func (r *nodeGroupResource) Read(ctx context.Context, req resource.ReadRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.read(ctx, &m); IsNotFound(err) {
+	if err := r.read(ctx, &m, true); IsNotFound(err) {
 		resp.State.RemoveResource(ctx)
 		return
 	} else if err != nil {
@@ -141,4 +147,25 @@ func (r *nodeGroupResource) Delete(ctx context.Context, req resource.DeleteReque
 
 func (r *nodeGroupResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("name"), req, resp)
+}
+
+var groupFamilies = map[string]string{"G@kernel:Windows": "Windows", "G@kernel:Linux": "Linux", "G@os_family:RedHat": "RHEL family",
+	"G@os_family:Debian": "Debian family", "G@os_family:Suse": "SUSE family"}
+var namePattern = regexp.MustCompile(`^[A-Za-z0-9_.*?-]{1,100}$`)
+
+// fromExpr sets kind and its field from the group's Salt expression (the reverse of how Gardience builds it).
+func fromExpr(ctx context.Context, m *nodeGroupModel, e string) {
+	m.Nodes = types.ListNull(types.StringType)
+	m.OS, m.Pattern, m.Expr = types.StringNull(), types.StringNull(), types.StringNull()
+	switch {
+	case strings.HasPrefix(e, "L@"):
+		m.Kind = types.StringValue("nodes")
+		m.Nodes, _ = types.ListValueFrom(ctx, types.StringType, strings.Split(e[2:], ","))
+	case groupFamilies[e] != "":
+		m.Kind, m.OS = types.StringValue("os"), types.StringValue(groupFamilies[e])
+	case namePattern.MatchString(e):
+		m.Kind, m.Pattern = types.StringValue("match"), types.StringValue(e)
+	default:
+		m.Kind, m.Expr = types.StringValue("compound"), types.StringValue(e)
+	}
 }

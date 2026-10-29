@@ -1,0 +1,1 @@
+terraform import gardience_change_window.linux_weekend linux-weekend
