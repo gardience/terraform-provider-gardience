@@ -15,6 +15,16 @@ resource "gardience_event_rule" "c_drive" {
   percent = 90
 }
 
+# Free space safely when /var is more than 85 percent full on a Linux machine, then warn.
+resource "gardience_event_rule" "var_cleanup" {
+  id      = "var-cleanup"
+  kind    = "disk"
+  os      = "linux"
+  path    = "/var"
+  percent = 85
+  cleanup = true
+}
+
 # Configure every new machine in "web" the moment it first joins.
 resource "gardience_event_rule" "web_join" {
   id    = "web-join"

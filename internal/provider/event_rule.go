@@ -24,6 +24,7 @@ type eventRuleModel struct {
 	Service types.String `tfsdk:"service"`
 	Path    types.String `tfsdk:"path"`
 	Percent types.Int64  `tfsdk:"percent"`
+	Cleanup types.Bool   `tfsdk:"cleanup"`
 	Scope   types.String `tfsdk:"scope"`
 	Group   types.String `tfsdk:"group"`
 	State   types.String `tfsdk:"state"`
@@ -37,6 +38,7 @@ type ruleAPI struct {
 	Service string `json:"service"`
 	Path    string `json:"path"`
 	Percent int64  `json:"percent"`
+	Cleanup bool   `json:"cleanup"`
 	Scope   string `json:"scope"`
 	Group   string `json:"group"`
 	State   string `json:"state"`
@@ -56,7 +58,7 @@ func (r *eventRuleResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Event-driven automation. Each machine's Salt agent reports events as they happen, and Gardience acts in seconds:\n\n" +
 			"* `service`: a watched service stopped: restart it on that machine.\n" +
-			"* `disk`: a disk passed a fill level: warn (audit log and notification, at most hourly per disk).\n" +
+			"* `disk`: a disk passed a fill level: warn (audit log and notification, at most hourly per disk), and with `cleanup = true` first free space safely (package caches, expired temporary files, old crash dumps; never logs).\n" +
 			"* `join`: a machine joined the fleet for the first time: apply a saved state (or `desired`) to it at once. " +
 			"Pair it with `gardience_enrollment` so every machine Terraform creates is configured on first boot.",
 		Attributes: map[string]schema.Attribute{
@@ -70,6 +72,7 @@ func (r *eventRuleResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"service": schema.StringAttribute{Optional: true, MarkdownDescription: "`service` rules: the service name, for example `W3SVC` or `nginx`."},
 			"path":    schema.StringAttribute{Optional: true, MarkdownDescription: "`disk` rules: a mount point such as `/var`, or a drive such as `C:`."},
 			"percent": schema.Int64Attribute{Optional: true, MarkdownDescription: "`disk` rules: fill level that triggers it, 50 to 99."},
+			"cleanup": schema.BoolAttribute{Optional: true, MarkdownDescription: "`disk` rules: also free space safely when the disk passes its level, at most every 6 hours per machine and disk (Gardience 1.22 and later)."},
 			"scope":   schema.StringAttribute{Optional: true, Validators: []validator.String{stringvalidator.OneOf("all", "windows", "linux", "group")}, MarkdownDescription: "`join` rules: which new machines (`all`, `windows`, `linux` or `group`)."},
 			"group":   schema.StringAttribute{Optional: true, MarkdownDescription: "`join` rules with `scope = \"group\"`: the node group."},
 			"state":   schema.StringAttribute{Optional: true, MarkdownDescription: "`join` rules: `desired` or the name of a `gardience_state`."},
@@ -86,6 +89,9 @@ func (r *eventRuleResource) put(ctx context.Context, m *eventRuleModel) error {
 		"path": m.Path.ValueString(), "scope": m.Scope.ValueString(), "group": m.Group.ValueString(), "state": m.State.ValueString()}
 	if !m.Percent.IsNull() {
 		body["percent"] = m.Percent.ValueInt64()
+	}
+	if !m.Cleanup.IsNull() {
+		body["cleanup"] = m.Cleanup.ValueBool()
 	}
 	if !m.Name.IsNull() && !m.Name.IsUnknown() {
 		body["name"] = m.Name.ValueString()
@@ -139,6 +145,9 @@ func (r *eventRuleResource) Read(ctx context.Context, req resource.ReadRequest, 
 		m.OS, m.Service = set(m.OS, out.OS), set(m.Service, out.Service)
 	case "disk":
 		m.OS, m.Path, m.Percent = set(m.OS, out.OS), set(m.Path, out.Path), types.Int64Value(out.Percent)
+		if !(m.Cleanup.IsNull() && !out.Cleanup) {
+			m.Cleanup = types.BoolValue(out.Cleanup)
+		}
 	case "join":
 		m.Scope, m.Group, m.State = set(m.Scope, out.Scope), set(m.Group, out.Group), set(m.State, out.State)
 	}

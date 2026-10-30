@@ -12,7 +12,7 @@ description: |-
 Event-driven automation. Each machine's Salt agent reports events as they happen, and Gardience acts in seconds:
 
 * `service`: a watched service stopped: restart it on that machine.
-* `disk`: a disk passed a fill level: warn (audit log and notification, at most hourly per disk).
+* `disk`: a disk passed a fill level: warn (audit log and notification, at most hourly per disk), and with `cleanup = true` first free space safely (package caches, expired temporary files, old crash dumps; never logs).
 * `join`: a machine joined the fleet for the first time: apply a saved state (or `desired`) to it at once. Pair it with `gardience_enrollment` so every machine Terraform creates is configured on first boot.
 
 ## Example Usage
@@ -35,6 +35,16 @@ resource "gardience_event_rule" "c_drive" {
   percent = 90
 }
 
+# Free space safely when /var is more than 85 percent full on a Linux machine, then warn.
+resource "gardience_event_rule" "var_cleanup" {
+  id      = "var-cleanup"
+  kind    = "disk"
+  os      = "linux"
+  path    = "/var"
+  percent = 85
+  cleanup = true
+}
+
 # Configure every new machine in "web" the moment it first joins.
 resource "gardience_event_rule" "web_join" {
   id    = "web-join"
@@ -55,6 +65,7 @@ resource "gardience_event_rule" "web_join" {
 
 ### Optional
 
+- `cleanup` (Boolean) `disk` rules: also free space safely when the disk passes its level, at most every 6 hours per machine and disk (Gardience 1.22 and later).
 - `group` (String) `join` rules with `scope = "group"`: the node group.
 - `name` (String) Display name (a sensible default is made from the rule).
 - `os` (String) `service` and `disk` rules: `windows` or `linux`.
